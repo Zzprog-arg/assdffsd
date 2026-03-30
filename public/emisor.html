@@ -1,15 +1,154 @@
+</body>
+</html>
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Emisor</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f3f7fb;
+      color: #16304f;
+    }
+
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 12px 28px rgba(18, 44, 75, 0.1);
+      margin-bottom: 18px;
+    }
+
+    h1,
+    h2 {
+      margin-top: 0;
+    }
+
+    .estado {
+      font-size: 16px;
+      margin: 10px 0 6px;
+    }
+
+    .tiempo {
+      font-size: 28px;
+      font-weight: bold;
+      margin: 0;
+    }
+
+    .fila {
+      margin-top: 16px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    input[type="file"],
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .acciones {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #1e79df;
+      color: #ffffff;
+    }
+
+    button.secundario {
+      background: #e8f0f9;
+      color: #16304f;
+    }
+
+    button.alerta {
+      background: #ef6a5b;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .nota {
+      margin-top: 10px;
+      color: #566c86;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 12px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Emisor de audio</h1>
-  <button id="startBtn">Iniciar transmisión</button>
-  <p id="estado">Esperando...</p>
-  <p id="tiempo">00:00</p>
+  <div class="page">
+    <div class="card">
+      <h1>Emisor de audio</h1>
+      <button id="startBtn">Iniciar transmision</button>
+      <p id="estado" class="estado">Esperando...</p>
+      <p id="tiempo" class="tiempo">00:00</p>
+    </div>
+
+    <div class="card">
+      <h2>Musica para oyentes</h2>
+
+      <div class="fila">
+        <label for="musicInput">Cargar archivo de audio</label>
+        <input id="musicInput" type="file" accept="audio/*" />
+      </div>
+
+      <div class="fila">
+        <label for="musicVolume">Volumen normal de la musica</label>
+        <input id="musicVolume" type="range" min="0" max="100" value="70" />
+      </div>
+
+      <div class="fila">
+        <label for="duckVolume">Volumen de la musica al hablar</label>
+        <input id="duckVolume" type="range" min="0" max="100" value="25" />
+      </div>
+
+      <div class="acciones">
+        <button id="playMusicBtn" class="secundario" disabled>Reproducir musica</button>
+        <button id="pauseMusicBtn" class="secundario" disabled>Pausar musica</button>
+        <button id="talkBtn" class="alerta" type="button">Hablar sobre la musica</button>
+      </div>
+
+      <p id="musicStatus" class="nota">Todavia no hay musica cargada.</p>
+      <audio id="musicPreview" controls preload="metadata"></audio>
+      <p class="nota">
+        Mantene presionado "Hablar sobre la musica" para bajar la musica mientras hablas.
+        En pantallas tactiles, un toque activa el modo hablar y otro toque lo desactiva.
+      </p>
+    </div>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -18,10 +157,28 @@
 
     const estado = document.getElementById("estado");
     const tiempo = document.getElementById("tiempo");
+    const startBtn = document.getElementById("startBtn");
+    const musicInput = document.getElementById("musicInput");
+    const musicVolume = document.getElementById("musicVolume");
+    const duckVolume = document.getElementById("duckVolume");
+    const playMusicBtn = document.getElementById("playMusicBtn");
+    const pauseMusicBtn = document.getElementById("pauseMusicBtn");
+    const talkBtn = document.getElementById("talkBtn");
+    const musicStatus = document.getElementById("musicStatus");
+    const musicPreview = document.getElementById("musicPreview");
 
-    let localStream = null;
+    let microphoneStream = null;
+    let broadcastStream = null;
+    let micSource = null;
+    let musicSource = null;
     let startedAt = null;
     let timer = null;
+    let audioContext = null;
+    let mixDestination = null;
+    let micGainNode = null;
+    let musicGainNode = null;
+    let isTalking = false;
+    let musicObjectUrl = null;
 
     const peers = new Map();
 
@@ -43,11 +200,62 @@
       }, 1000);
     }
 
+    function getNormalMusicVolume() {
+      return Number(musicVolume.value) / 100;
+    }
+
+    function getTalkingMusicVolume() {
+      return Number(duckVolume.value) / 100;
+    }
+
+    function updateMusicGain() {
+      if (!musicGainNode) return;
+      musicGainNode.gain.value = isTalking
+        ? getTalkingMusicVolume()
+        : getNormalMusicVolume();
+    }
+
+    function ensureAudioGraph() {
+      if (audioContext) return;
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      mixDestination = audioContext.createMediaStreamDestination();
+      micGainNode = audioContext.createGain();
+      musicGainNode = audioContext.createGain();
+
+      micGainNode.gain.value = 1;
+      updateMusicGain();
+
+      micGainNode.connect(mixDestination);
+      musicGainNode.connect(mixDestination);
+
+      broadcastStream = mixDestination.stream;
+    }
+
+    async function ensureAudioReady() {
+      ensureAudioGraph();
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+    }
+
+    function setTalkingState(nextTalking) {
+      isTalking = nextTalking;
+      updateMusicGain();
+      talkBtn.textContent = nextTalking
+        ? "Soltar modo hablar"
+        : "Hablar sobre la musica";
+      musicStatus.textContent = nextTalking
+        ? "La musica bajo para que el emisor pueda hablar."
+        : "La musica volvio a su volumen normal.";
+    }
+
     async function createPeer(listenerId) {
       const pc = new RTCPeerConnection(config);
 
-      localStream.getTracks().forEach(track => {
-        pc.addTrack(track, localStream);
+      broadcastStream.getTracks().forEach(track => {
+        pc.addTrack(track, broadcastStream);
       });
 
       pc.onicecandidate = (event) => {
@@ -72,15 +280,25 @@
       return pc;
     }
 
-    document.getElementById("startBtn").onclick = async () => {
+    startBtn.onclick = async () => {
       try {
-        estado.textContent = "Pidiendo micrófono...";
-        localStream = await navigator.mediaDevices.getUserMedia({
+        estado.textContent = "Pidiendo microfono...";
+        await ensureAudioReady();
+
+        microphoneStream = await navigator.mediaDevices.getUserMedia({
           audio: true,
           video: false
         });
 
+        if (micSource) {
+          micSource.disconnect();
+        }
+
+        micSource = audioContext.createMediaStreamSource(microphoneStream);
+        micSource.connect(micGainNode);
+
         estado.textContent = "Transmitiendo...";
+        startBtn.disabled = true;
         startTimer();
       } catch (err) {
         console.error(err);
@@ -88,9 +306,91 @@
       }
     };
 
+    musicInput.onchange = async (event) => {
+      const file = event.target.files && event.target.files[0];
+
+      if (!file) {
+        musicStatus.textContent = "Todavia no hay musica cargada.";
+        playMusicBtn.disabled = true;
+        pauseMusicBtn.disabled = true;
+        musicPreview.removeAttribute("src");
+        musicPreview.load();
+        return;
+      }
+
+      await ensureAudioReady();
+
+      if (musicObjectUrl) {
+        URL.revokeObjectURL(musicObjectUrl);
+      }
+
+      musicObjectUrl = URL.createObjectURL(file);
+      musicPreview.src = musicObjectUrl;
+      musicPreview.loop = true;
+      musicPreview.load();
+
+      if (!musicSource) {
+        musicSource = audioContext.createMediaElementSource(musicPreview);
+        musicSource.connect(musicGainNode);
+        musicSource.connect(audioContext.destination);
+      }
+
+      updateMusicGain();
+      playMusicBtn.disabled = false;
+      pauseMusicBtn.disabled = false;
+      musicStatus.textContent = "Musica cargada y lista para salir al aire.";
+    };
+
+    playMusicBtn.onclick = async () => {
+      try {
+        await ensureAudioReady();
+        await musicPreview.play();
+        musicStatus.textContent = "Musica sonando para los oyentes.";
+      } catch (err) {
+        console.error(err);
+        musicStatus.textContent = "No se pudo reproducir la musica.";
+      }
+    };
+
+    pauseMusicBtn.onclick = () => {
+      musicPreview.pause();
+      musicStatus.textContent = "Musica en pausa.";
+    };
+
+    musicVolume.oninput = () => {
+      updateMusicGain();
+      if (!isTalking) {
+        musicStatus.textContent = "Volumen normal actualizado.";
+      }
+    };
+
+    duckVolume.oninput = () => {
+      updateMusicGain();
+      if (isTalking) {
+        musicStatus.textContent = "Volumen al hablar actualizado.";
+      }
+    };
+
+    talkBtn.onmousedown = () => {
+      if (window.matchMedia("(pointer: coarse)").matches) return;
+      setTalkingState(true);
+    };
+    talkBtn.onmouseup = () => {
+      if (window.matchMedia("(pointer: coarse)").matches) return;
+      setTalkingState(false);
+    };
+    talkBtn.onmouseleave = () => {
+      if (window.matchMedia("(pointer: coarse)").matches) return;
+      setTalkingState(false);
+    };
+    talkBtn.ontouchstart = (event) => {
+      event.preventDefault();
+      setTalkingState(!isTalking);
+    };
+
     socket.on("listener-joined", async ({ listenerId }) => {
       try {
-        if (!localStream) return;
+        if (!broadcastStream) return;
         estado.textContent = "Oyente conectado, enviando audio...";
         await createPeer(listenerId);
       } catch (err) {
@@ -104,7 +404,7 @@
         if (!pc) return;
 
         if (pc.signalingState !== "have-local-offer") {
-          console.warn("Se ignoró answer en estado:", pc.signalingState);
+          console.warn("Se ignoro answer en estado:", pc.signalingState);
           return;
         }
 
