@@ -3,13 +3,303 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Oyente</title>
+  <title>Con dios todo es posible - Radio</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #ffffff;
+      background:
+        radial-gradient(circle at top, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.05) 18%, transparent 40%),
+        linear-gradient(180deg, #cfefff 0%, #9ed8ff 28%, #68bdf3 58%, #3e9fe0 100%);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .cloud {
+      position: absolute;
+      background: rgba(255,255,255,0.72);
+      border-radius: 999px;
+      filter: blur(1px);
+      animation: floatCloud linear infinite;
+    }
+
+    .cloud::before,
+    .cloud::after {
+      content: "";
+      position: absolute;
+      background: rgba(255,255,255,0.72);
+      border-radius: 999px;
+    }
+
+    .cloud1 {
+      width: 160px;
+      height: 52px;
+      top: 80px;
+      left: -200px;
+      animation-duration: 38s;
+    }
+
+    .cloud1::before {
+      width: 70px;
+      height: 70px;
+      left: 20px;
+      top: -28px;
+    }
+
+    .cloud1::after {
+      width: 90px;
+      height: 90px;
+      right: 18px;
+      top: -38px;
+    }
+
+    .cloud2 {
+      width: 220px;
+      height: 65px;
+      top: 170px;
+      left: -260px;
+      animation-duration: 55s;
+      animation-delay: 8s;
+      opacity: 0.8;
+    }
+
+    .cloud2::before {
+      width: 85px;
+      height: 85px;
+      left: 30px;
+      top: -32px;
+    }
+
+    .cloud2::after {
+      width: 100px;
+      height: 100px;
+      right: 26px;
+      top: -42px;
+    }
+
+    .cloud3 {
+      width: 140px;
+      height: 45px;
+      top: 280px;
+      left: -180px;
+      animation-duration: 46s;
+      animation-delay: 15s;
+      opacity: 0.7;
+    }
+
+    .cloud3::before {
+      width: 60px;
+      height: 60px;
+      left: 18px;
+      top: -22px;
+    }
+
+    .cloud3::after {
+      width: 75px;
+      height: 75px;
+      right: 18px;
+      top: -30px;
+    }
+
+    @keyframes floatCloud {
+      from {
+        transform: translateX(0);
+      }
+      to {
+        transform: translateX(calc(100vw + 320px));
+      }
+    }
+
+    .page {
+      position: relative;
+      z-index: 2;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .radio-card {
+      width: 100%;
+      max-width: 460px;
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-radius: 28px;
+      box-shadow: 0 25px 55px rgba(0, 65, 118, 0.25);
+      padding: 28px 24px 30px;
+      text-align: center;
+    }
+
+    .halo {
+      width: 122px;
+      height: 122px;
+      margin: 0 auto 18px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,0.98), rgba(255,255,255,0.45) 35%, rgba(255,255,255,0.15) 60%, rgba(255,255,255,0.02) 75%),
+        linear-gradient(145deg, rgba(255,255,255,0.65), rgba(124,214,255,0.28));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow:
+        0 0 35px rgba(255,255,255,0.55),
+        0 0 70px rgba(171, 230, 255, 0.45);
+      font-size: 52px;
+    }
+
+    .sub {
+      font-size: 13px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-size: 33px;
+      line-height: 1.15;
+      margin-bottom: 12px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .desc {
+      font-size: 15px;
+      line-height: 1.6;
+      color: rgba(255,255,255,0.92);
+      margin-bottom: 22px;
+    }
+
+    .player-box {
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.24);
+      border-radius: 22px;
+      padding: 18px 16px;
+      margin-bottom: 20px;
+      box-shadow: inset 0 0 18px rgba(255,255,255,0.08);
+    }
+
+    .live-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      font-weight: bold;
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff4d6d;
+      box-shadow: 0 0 10px rgba(255, 77, 109, 0.75);
+      animation: pulse 1.3s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.75; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .estado {
+      min-height: 24px;
+      font-size: 15px;
+      color: rgba(255,255,255,0.96);
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      width: 100%;
+      border: none;
+      border-radius: 18px;
+      padding: 16px 18px;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #1672aa;
+      background: linear-gradient(180deg, #ffffff 0%, #dff5ff 100%);
+      box-shadow:
+        0 14px 28px rgba(21, 109, 170, 0.25),
+        inset 0 1px 0 rgba(255,255,255,0.95);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 18px 30px rgba(21, 109, 170, 0.3),
+        inset 0 1px 0 rgba(255,255,255,0.95);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 16px;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .footer-text {
+      margin-top: 18px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.5;
+    }
+  </style>
 </head>
 <body>
-  <h1>Oyente</h1>
-  <button id="activarBtn">Activar audio</button>
-  <p id="estado">Esperando transmisión...</p>
-  <audio id="remoteAudio" controls autoplay playsinline></audio>
+  <div class="cloud cloud1"></div>
+  <div class="cloud cloud2"></div>
+  <div class="cloud cloud3"></div>
+
+  <div class="page">
+    <div class="radio-card">
+      <div class="halo">☁️</div>
+      <div class="sub">Radio en vivo</div>
+      <h1>Con dios todo es posible</h1>
+      <p class="desc">
+        Una señal de fe, paz y esperanza para escuchar en cualquier momento.
+      </p>
+
+      <div class="player-box">
+        <div class="live-row">
+          <span class="dot"></span>
+          <span>EN VIVO</span>
+        </div>
+
+        <p class="estado" id="estado">Esperando transmisión...</p>
+
+        <button id="activarBtn" class="btn">▶ Reproducir radio</button>
+
+        <audio id="remoteAudio" controls autoplay playsinline></audio>
+      </div>
+
+      <p class="footer-text">
+        Si no se escucha al instante, tocá nuevamente el botón para habilitar el audio del navegador.
+      </p>
+    </div>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -18,6 +308,7 @@
 
     const audio = document.getElementById("remoteAudio");
     const estado = document.getElementById("estado");
+    const activarBtn = document.getElementById("activarBtn");
 
     let pc = null;
     let audioActivado = false;
@@ -29,20 +320,22 @@
       ]
     };
 
-    document.getElementById("activarBtn").onclick = async () => {
+    activarBtn.onclick = async () => {
       try {
         audioActivado = true;
         await audio.play().catch(() => {});
-        estado.textContent = "Audio activado. Esperando transmisión...";
+        estado.textContent = "Radio lista para reproducirse...";
+        activarBtn.textContent = "⏸ Radio activada";
       } catch (err) {
         console.error(err);
+        estado.textContent = "Tocá nuevamente para habilitar el audio";
       }
     };
 
     socket.on("offer", async ({ fromId, offer }) => {
       try {
         emisorId = fromId;
-        estado.textContent = "Oferta recibida...";
+        estado.textContent = "Conectando con la radio...";
 
         if (pc) {
           pc.close();
@@ -54,12 +347,12 @@
         pc.ontrack = async (event) => {
           try {
             audio.srcObject = event.streams[0];
-            estado.textContent = "Audio recibido";
+            estado.textContent = "Transmitiendo ahora";
 
             if (audioActivado) {
               await audio.play().catch(() => {});
             } else {
-              estado.textContent = "Tocá Activar audio";
+              estado.textContent = "Tocá 'Reproducir radio'";
             }
           } catch (err) {
             console.error("Error ontrack:", err);
@@ -85,7 +378,7 @@
         });
       } catch (err) {
         console.error("Error en offer:", err);
-        estado.textContent = "Error: " + err.message;
+        estado.textContent = "Error al conectar con la radio";
       }
     });
 
