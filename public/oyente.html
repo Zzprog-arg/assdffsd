@@ -2,18 +2,26 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Oyente</title>
 </head>
 <body>
   <h1>Oyente</h1>
-  <audio id="remoteAudio" autoplay controls></audio>
+  <button id="activarBtn">Activar audio</button>
+  <p id="estado">Esperando transmisión...</p>
+  <audio id="remoteAudio" controls autoplay playsinline></audio>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
     socket.emit("join-role", "oyente");
 
-    let pc;
+    const audio = document.getElementById("remoteAudio");
+    const estado = document.getElementById("estado");
+
+    let pc = null;
+    let audioActivado = false;
+    let emisorId = null;
 
     const config = {
       iceServers: [
@@ -21,32 +29,72 @@
       ]
     };
 
-    socket.on("offer", async (offer) => {
-      pc = new RTCPeerConnection(config);
-
-      pc.ontrack = (event) => {
-        document.getElementById("remoteAudio").srcObject = event.streams[0];
-      };
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("ice-candidate", event.candidate);
-        }
-      };
-
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      socket.emit("answer", answer);
-    });
-
-    socket.on("ice-candidate", async (candidate) => {
+    document.getElementById("activarBtn").onclick = async () => {
       try {
-        if (pc) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        }
+        audioActivado = true;
+        await audio.play().catch(() => {});
+        estado.textContent = "Audio activado. Esperando transmisión...";
       } catch (err) {
         console.error(err);
+      }
+    };
+
+    socket.on("offer", async ({ fromId, offer }) => {
+      try {
+        emisorId = fromId;
+        estado.textContent = "Oferta recibida...";
+
+        if (pc) {
+          pc.close();
+          pc = null;
+        }
+
+        pc = new RTCPeerConnection(config);
+
+        pc.ontrack = async (event) => {
+          try {
+            audio.srcObject = event.streams[0];
+            estado.textContent = "Audio recibido";
+
+            if (audioActivado) {
+              await audio.play().catch(() => {});
+            } else {
+              estado.textContent = "Tocá Activar audio";
+            }
+          } catch (err) {
+            console.error("Error ontrack:", err);
+          }
+        };
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate && emisorId) {
+            socket.emit("ice-candidate", {
+              targetId: emisorId,
+              candidate: event.candidate
+            });
+          }
+        };
+
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        socket.emit("answer", {
+          targetId: emisorId,
+          answer
+        });
+      } catch (err) {
+        console.error("Error en offer:", err);
+        estado.textContent = "Error: " + err.message;
+      }
+    });
+
+    socket.on("ice-candidate", async ({ fromId, candidate }) => {
+      try {
+        if (!pc || fromId !== emisorId) return;
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.error("Error ICE:", err);
       }
     });
   </script>
