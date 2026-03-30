@@ -2,16 +2,18 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Emisor</title>
 </head>
 <body>
   <h1>Emisor de audio</h1>
   <button id="startBtn">Iniciar transmisión</button>
+  <p id="estado">Esperando...</p>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    socket.emit("join-role", "emisor");
+    const estado = document.getElementById("estado");
 
     let pc;
     let localStream;
@@ -23,28 +25,45 @@
     };
 
     document.getElementById("startBtn").onclick = async () => {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      try {
+        estado.textContent = "Pidiendo micrófono...";
+        localStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false
+        });
 
-      pc = new RTCPeerConnection(config);
+        estado.textContent = "Micrófono OK. Conectando...";
+        pc = new RTCPeerConnection(config);
 
-      localStream.getTracks().forEach(track => {
-        pc.addTrack(track, localStream);
-      });
+        localStream.getTracks().forEach(track => {
+          pc.addTrack(track, localStream);
+        });
 
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("ice-candidate", event.candidate);
-        }
-      };
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            socket.emit("ice-candidate", event.candidate);
+          }
+        };
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socket.emit("offer", offer);
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit("offer", offer);
+
+        estado.textContent = "Transmitiendo...";
+      } catch (err) {
+        console.error(err);
+        estado.textContent = "Error: " + err.message;
+      }
     };
 
     socket.on("answer", async (answer) => {
-      if (pc) {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      try {
+        if (pc) {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        }
+      } catch (err) {
+        console.error("Error answer:", err);
+        estado.textContent = "Error answer: " + err.message;
       }
     });
 
@@ -54,7 +73,7 @@
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
         }
       } catch (err) {
-        console.error(err);
+        console.error("Error ICE:", err);
       }
     });
   </script>
