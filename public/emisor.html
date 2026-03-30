@@ -9,20 +9,68 @@
   <h1>Emisor de audio</h1>
   <button id="startBtn">Iniciar transmisión</button>
   <p id="estado">Esperando...</p>
+  <p id="tiempo">00:00</p>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    const estado = document.getElementById("estado");
+    socket.emit("join-role", "emisor");
 
-    let pc;
-    let localStream;
+    const estado = document.getElementById("estado");
+    const tiempo = document.getElementById("tiempo");
+
+    let localStream = null;
+    let startedAt = null;
+    let timer = null;
+
+    const peers = new Map();
 
     const config = {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" }
       ]
     };
+
+    function startTimer() {
+      if (timer) clearInterval(timer);
+      startedAt = Date.now();
+
+      timer = setInterval(() => {
+        const diff = Math.floor((Date.now() - startedAt) / 1000);
+        const mm = String(Math.floor(diff / 60)).padStart(2, "0");
+        const ss = String(diff % 60).padStart(2, "0");
+        tiempo.textContent = `${mm}:${ss}`;
+      }, 1000);
+    }
+
+    async function createPeer(listenerId) {
+      const pc = new RTCPeerConnection(config);
+
+      localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+      });
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit("ice-candidate", {
+            targetId: listenerId,
+            candidate: event.candidate
+          });
+        }
+      };
+
+      peers.set(listenerId, pc);
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      socket.emit("offer", {
+        targetId: listenerId,
+        offer
+      });
+
+      return pc;
+    }
 
     document.getElementById("startBtn").onclick = async () => {
       try {
@@ -32,46 +80,45 @@
           video: false
         });
 
-        estado.textContent = "Micrófono OK. Conectando...";
-        pc = new RTCPeerConnection(config);
-
-        localStream.getTracks().forEach(track => {
-          pc.addTrack(track, localStream);
-        });
-
-        pc.onicecandidate = (event) => {
-          if (event.candidate) {
-            socket.emit("ice-candidate", event.candidate);
-          }
-        };
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit("offer", offer);
-
         estado.textContent = "Transmitiendo...";
+        startTimer();
       } catch (err) {
         console.error(err);
         estado.textContent = "Error: " + err.message;
       }
     };
 
-    socket.on("answer", async (answer) => {
+    socket.on("listener-joined", async ({ listenerId }) => {
       try {
-        if (pc) {
-          await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        }
+        if (!localStream) return;
+        estado.textContent = "Oyente conectado, enviando audio...";
+        await createPeer(listenerId);
       } catch (err) {
-        console.error("Error answer:", err);
-        estado.textContent = "Error answer: " + err.message;
+        console.error("Error creando peer:", err);
       }
     });
 
-    socket.on("ice-candidate", async (candidate) => {
+    socket.on("answer", async ({ fromId, answer }) => {
       try {
-        if (pc) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        const pc = peers.get(fromId);
+        if (!pc) return;
+
+        if (pc.signalingState !== "have-local-offer") {
+          console.warn("Se ignoró answer en estado:", pc.signalingState);
+          return;
         }
+
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (err) {
+        console.error("Error answer:", err);
+      }
+    });
+
+    socket.on("ice-candidate", async ({ fromId, candidate }) => {
+      try {
+        const pc = peers.get(fromId);
+        if (!pc) return;
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (err) {
         console.error("Error ICE:", err);
       }
