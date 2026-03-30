@@ -1,6 +1,7 @@
 const express = require("express");
 const http = require("http");
 const path = require("path");
+const fs = require("fs");
 const { Server } = require("socket.io");
 
 const app = express();
@@ -11,11 +12,37 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3000;
+const musicDir = path.join(__dirname, "music");
 
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/music", express.static(musicDir));
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/music", async (req, res) => {
+  try {
+    const entries = await fs.promises.readdir(musicDir, { withFileTypes: true });
+    const files = entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .filter((name) => /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(name))
+      .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))
+      .map((name) => ({
+        name,
+        url: `/music/${encodeURIComponent(name)}`
+      }));
+
+    res.json({ files });
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return res.json({ files: [] });
+    }
+
+    console.error("Error leyendo carpeta music:", error);
+    res.status(500).json({ error: "No se pudo leer la carpeta music" });
+  }
 });
 
 let emisorId = null;
