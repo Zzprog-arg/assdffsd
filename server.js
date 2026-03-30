@@ -1,11 +1,11 @@
 const express = require("express");
 const http = require("http");
 const path = require("path");
-const os = require("os");
 const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
   cors: { origin: "*" }
 });
@@ -18,46 +18,65 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
 
-function getLocalIP() {
-  const interfaces = os.networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === "IPv4" && !iface.internal) {
-        return iface.address;
-      }
-    }
-  }
-  return "localhost";
-}
+let emisorId = null;
+const oyentes = new Set();
 
 io.on("connection", (socket) => {
   console.log("Conectado:", socket.id);
 
-  socket.on("offer", (offer) => {
-    console.log("Offer recibida");
-    socket.broadcast.emit("offer", offer);
+  socket.on("join-role", (role) => {
+    socket.data.role = role;
+
+    if (role === "emisor") {
+      emisorId = socket.id;
+      console.log("Emisor registrado:", socket.id);
+    }
+
+    if (role === "oyente") {
+      oyentes.add(socket.id);
+      console.log("Oyente registrado:", socket.id);
+
+      if (emisorId) {
+        io.to(emisorId).emit("listener-joined", { listenerId: socket.id });
+      }
+    }
   });
 
-  socket.on("answer", (answer) => {
-    console.log("Answer recibida");
-    socket.broadcast.emit("answer", answer);
+  socket.on("offer", ({ targetId, offer }) => {
+    if (!targetId) return;
+    io.to(targetId).emit("offer", {
+      fromId: socket.id,
+      offer
+    });
   });
 
-  socket.on("ice-candidate", (candidate) => {
-    socket.broadcast.emit("ice-candidate", candidate);
+  socket.on("answer", ({ targetId, answer }) => {
+    if (!targetId) return;
+    io.to(targetId).emit("answer", {
+      fromId: socket.id,
+      answer
+    });
+  });
+
+  socket.on("ice-candidate", ({ targetId, candidate }) => {
+    if (!targetId) return;
+    io.to(targetId).emit("ice-candidate", {
+      fromId: socket.id,
+      candidate
+    });
   });
 
   socket.on("disconnect", () => {
     console.log("Desconectado:", socket.id);
+
+    if (socket.id === emisorId) {
+      emisorId = null;
+    }
+
+    oyentes.delete(socket.id);
   });
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  const ip = getLocalIP();
-  console.log("=================================");
-  console.log(`Servidor: http://localhost:${PORT}`);
-  console.log(`Red:      http://${ip}:${PORT}`);
-  console.log(`Emisor:   http://${ip}:${PORT}/emisor.html`);
-  console.log(`Oyente:   http://${ip}:${PORT}/oyente.html`);
-  console.log("=================================");
+  console.log(`Servidor en puerto ${PORT}`);
 });
