@@ -133,6 +133,7 @@
       <button id="startBtn">Iniciar transmision</button>
       <p id="estado" class="estado">Esperando...</p>
       <p id="tiempo" class="tiempo">00:00</p>
+      <p id="listenerCount" class="nota">Dispositivos conectados: 0</p>
     </div>
 
     <div class="card">
@@ -198,6 +199,7 @@
     const estado = document.getElementById("estado");
     const tiempo = document.getElementById("tiempo");
     const startBtn = document.getElementById("startBtn");
+    const listenerCount = document.getElementById("listenerCount");
     const muteMicBtn = document.getElementById("muteMicBtn");
     const micVolume = document.getElementById("micVolume");
     const micStatus = document.getElementById("micStatus");
@@ -557,6 +559,10 @@
       } catch (err) {
         console.error("Error answer:", err);
       }
+    });
+
+    socket.on("listener-count", ({ count }) => {
+      listenerCount.textContent = `Dispositivos conectados: ${count}`;
     });
 
     socket.on("ice-candidate", async ({ fromId, candidate }) => {
