@@ -48,6 +48,14 @@ app.get("/api/music", async (req, res) => {
 let emisorId = null;
 const oyentes = new Set();
 
+function emitListenerCount() {
+  if (!emisorId) return;
+
+  io.to(emisorId).emit("listener-count", {
+    count: oyentes.size
+  });
+}
+
 io.on("connection", (socket) => {
   console.log("Conectado:", socket.id);
 
@@ -57,11 +65,13 @@ io.on("connection", (socket) => {
     if (role === "emisor") {
       emisorId = socket.id;
       console.log("Emisor registrado:", socket.id);
+      emitListenerCount();
     }
 
     if (role === "oyente") {
       oyentes.add(socket.id);
       console.log("Oyente registrado:", socket.id);
+      emitListenerCount();
 
       if (emisorId) {
         io.to(emisorId).emit("listener-joined", { listenerId: socket.id });
@@ -100,7 +110,9 @@ io.on("connection", (socket) => {
       emisorId = null;
     }
 
-    oyentes.delete(socket.id);
+    if (oyentes.delete(socket.id)) {
+      emitListenerCount();
+    }
   });
 });
 
