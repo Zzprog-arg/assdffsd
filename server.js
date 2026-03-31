@@ -47,6 +47,8 @@ app.get("/api/music", async (req, res) => {
 
 let emisorId = null;
 const oyentes = new Set();
+let nextOyenteNumber = 1;
+const mensajes = [];
 
 function emitListenerCount() {
   if (!emisorId) return;
@@ -69,9 +71,14 @@ io.on("connection", (socket) => {
     }
 
     if (role === "oyente") {
+      const oyenteLabel = `Oyente ${nextOyenteNumber++}`;
+      socket.data.listenerLabel = oyenteLabel;
       oyentes.add(socket.id);
       console.log("Oyente registrado:", socket.id);
       emitListenerCount();
+      socket.emit("listener-identity", {
+        listenerId: oyenteLabel
+      });
 
       if (emisorId) {
         io.to(emisorId).emit("listener-joined", { listenerId: socket.id });
@@ -103,6 +110,23 @@ io.on("connection", (socket) => {
     });
   });
 
+  socket.on("listener-message", ({ text }) => {
+    const cleanText = typeof text === "string" ? text.trim() : "";
+    const listenerId = socket.data.listenerLabel;
+
+    if (!listenerId || !cleanText) return;
+
+    const message = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      listenerId,
+      text: cleanText,
+      createdAt: new Date().toISOString()
+    };
+
+    mensajes.push(message);
+    io.emit("new-listener-message", message);
+  });
+
   socket.on("disconnect", () => {
     console.log("Desconectado:", socket.id);
 
@@ -114,6 +138,10 @@ io.on("connection", (socket) => {
       emitListenerCount();
     }
   });
+});
+
+app.get("/api/messages", (req, res) => {
+  res.json({ messages: mensajes });
 });
 
 server.listen(PORT, "0.0.0.0", () => {
