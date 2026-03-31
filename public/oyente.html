@@ -18,7 +18,7 @@
       background:
         radial-gradient(circle at top, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.05) 18%, transparent 40%),
         linear-gradient(180deg, #cfefff 0%, #9ed8ff 28%, #68bdf3 58%, #3e9fe0 100%);
-      overflow: hidden;
+      overflow-x: hidden;
       position: relative;
     }
 
@@ -129,7 +129,7 @@
 
     .radio-card {
       width: 100%;
-      max-width: 460px;
+      max-width: 500px;
       background: rgba(255, 255, 255, 0.18);
       border: 1px solid rgba(255, 255, 255, 0.35);
       backdrop-filter: blur(14px);
@@ -176,16 +176,20 @@
       font-size: 15px;
       line-height: 1.6;
       color: rgba(255,255,255,0.92);
-      margin-bottom: 22px;
+      margin-bottom: 18px;
     }
 
-    .player-box {
+    .player-box,
+    .chat-box {
       background: rgba(255,255,255,0.16);
       border: 1px solid rgba(255,255,255,0.24);
       border-radius: 22px;
       padding: 18px 16px;
-      margin-bottom: 20px;
       box-shadow: inset 0 0 18px rgba(255,255,255,0.08);
+    }
+
+    .player-box {
+      margin-bottom: 18px;
     }
 
     .live-row {
@@ -253,18 +257,73 @@
       opacity: 0.7;
     }
 
+    .listener-id {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.22);
+      font-size: 14px;
+      font-weight: bold;
+      color: rgba(255,255,255,0.96);
+    }
+
+    .chat-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .chat-text {
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.9);
+      margin-bottom: 14px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      border: none;
+      border-radius: 18px;
+      padding: 16px;
+      resize: vertical;
+      font: inherit;
+      color: #16304f;
+      background: rgba(255,255,255,0.95);
+      outline: none;
+      box-shadow: inset 0 2px 10px rgba(21, 109, 170, 0.12);
+    }
+
+    .send-btn {
+      width: 100%;
+      margin-top: 12px;
+      border: none;
+      border-radius: 18px;
+      padding: 15px 18px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #ffffff;
+      background: linear-gradient(180deg, #0f8cd6 0%, #0b6fb1 100%);
+      box-shadow: 0 14px 26px rgba(8, 92, 147, 0.24);
+    }
+
+    .chat-status,
+    .footer-text {
+      margin-top: 14px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.5;
+    }
+
     audio {
       width: 100%;
       margin-top: 16px;
       border-radius: 14px;
       overflow: hidden;
-    }
-
-    .footer-text {
-      margin-top: 18px;
-      font-size: 13px;
-      color: rgba(255,255,255,0.85);
-      line-height: 1.5;
     }
   </style>
 </head>
@@ -295,6 +354,17 @@
         <audio id="remoteAudio" controls autoplay playsinline></audio>
       </div>
 
+      <div class="chat-box">
+        <div id="listenerId" class="listener-id">Asignando tu ID...</div>
+        <div class="chat-title">Enviar mensaje</div>
+        <p class="chat-text">
+          Tu mensaje no lo verán otros oyentes. Se enviará con tu ID al panel de mensajes.
+        </p>
+        <textarea id="messageInput" maxlength="400" placeholder="Escribí tu mensaje acá..."></textarea>
+        <button id="sendBtn" class="send-btn">Enviar mensaje</button>
+        <p id="chatStatus" class="chat-status">Todavía no enviaste ningún mensaje.</p>
+      </div>
+
       <p class="footer-text">
         Si no se escucha al instante, tocá nuevamente el botón para habilitar el audio del navegador.
       </p>
@@ -309,10 +379,15 @@
     const audio = document.getElementById("remoteAudio");
     const estado = document.getElementById("estado");
     const activarBtn = document.getElementById("activarBtn");
+    const listenerId = document.getElementById("listenerId");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const chatStatus = document.getElementById("chatStatus");
 
     let pc = null;
     let audioActivado = false;
     let emisorId = null;
+    let assignedListenerId = "Oyente";
 
     const config = {
       iceServers: [
@@ -331,6 +406,30 @@
         estado.textContent = "Tocá nuevamente para habilitar el audio";
       }
     };
+
+    sendBtn.onclick = () => {
+      const text = messageInput.value.trim();
+
+      if (!text) {
+        chatStatus.textContent = "Escribí un mensaje antes de enviarlo.";
+        return;
+      }
+
+      socket.emit("listener-message", { text });
+      chatStatus.textContent = `Mensaje enviado como ${assignedListenerId}.`;
+      messageInput.value = "";
+    };
+
+    messageInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        sendBtn.click();
+      }
+    });
+
+    socket.on("listener-identity", ({ listenerId: id }) => {
+      assignedListenerId = id;
+      listenerId.textContent = id;
+    });
 
     socket.on("offer", async ({ fromId, offer }) => {
       try {
